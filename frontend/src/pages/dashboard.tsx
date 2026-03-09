@@ -7,6 +7,11 @@ import { usePoll } from '@/hooks/use-poll'
 import { api } from '@/lib/api'
 import type { BjornStatus } from '@/lib/api'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
   Crosshair, Network, ShieldAlert, KeyRound,
   FolderOpen, Skull, Play, Square, RotateCcw,
   Power, PowerOff,
@@ -17,14 +22,15 @@ const STAT_CARDS: {
   label: string
   icon: typeof Network
   color: string
+  tip: string
 }[] = [
-  { key: 'alive_hosts', label: 'Alive Hosts', icon: Network, color: 'text-green-400' },
-  { key: 'targets', label: 'Targets', icon: Crosshair, color: 'text-blue-400' },
-  { key: 'open_ports', label: 'Open Ports', icon: Network, color: 'text-cyan-400' },
-  { key: 'vulnerabilities', label: 'Vulns', icon: ShieldAlert, color: 'text-red-400' },
-  { key: 'credentials', label: 'Creds', icon: KeyRound, color: 'text-yellow-400' },
-  { key: 'stolen_data', label: 'Data Stolen', icon: FolderOpen, color: 'text-purple-400' },
-  { key: 'zombies', label: 'Zombies', icon: Skull, color: 'text-orange-400' },
+  { key: 'alive_hosts', label: 'Alive Hosts', icon: Network, color: 'text-green-400', tip: 'Hosts responding to ping/ARP on the local network' },
+  { key: 'targets', label: 'Targets', icon: Crosshair, color: 'text-blue-400', tip: 'Total targets currently being tracked' },
+  { key: 'open_ports', label: 'Open Ports', icon: Network, color: 'text-cyan-400', tip: 'Open TCP/UDP ports discovered across all hosts' },
+  { key: 'vulnerabilities', label: 'Vulns', icon: ShieldAlert, color: 'text-red-400', tip: 'Vulnerabilities found by nmap vuln scripts' },
+  { key: 'credentials', label: 'Creds', icon: KeyRound, color: 'text-yellow-400', tip: 'Passwords cracked via SSH/FTP/SMB/Telnet/SQL/RDP brute force' },
+  { key: 'stolen_data', label: 'Data Stolen', icon: FolderOpen, color: 'text-purple-400', tip: 'Files exfiltrated from compromised targets' },
+  { key: 'zombies', label: 'Zombies', icon: Skull, color: 'text-orange-400', tip: 'Successfully compromised hosts under control' },
 ]
 
 export function DashboardPage() {
@@ -70,20 +76,25 @@ export function DashboardPage() {
       )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {STAT_CARDS.map(({ key, label, icon: Icon, color }) => (
-          <Card key={key} className="bg-card/60">
-            <CardHeader className="pb-1 pt-3 px-4">
-              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                <Icon className={`size-3.5 ${color}`} />
-                {label}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-3">
-              <div className="text-2xl font-bold tabular-nums">
-                {loading ? '—' : String(status?.[key] ?? 0)}
-              </div>
-            </CardContent>
-          </Card>
+        {STAT_CARDS.map(({ key, label, icon: Icon, color, tip }) => (
+          <Tooltip key={key}>
+            <TooltipTrigger className="text-left w-full">
+              <Card className="bg-card/60 cursor-help">
+                <CardHeader className="pb-1 pt-3 px-4">
+                  <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                    <Icon className={`size-3.5 ${color}`} />
+                    {label}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-3">
+                  <div className="text-2xl font-bold tabular-nums">
+                    {loading ? '—' : String(status?.[key] ?? 0)}
+                  </div>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>{tip}</TooltipContent>
+          </Tooltip>
         ))}
         <Card className="bg-card/60">
           <CardHeader className="pb-1 pt-3 px-4">

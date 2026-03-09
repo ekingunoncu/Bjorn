@@ -19,16 +19,18 @@ import {
   Settings,
   Wrench,
   Skull,
+  Wifi,
 } from 'lucide-react'
 
-const NAV_ITEMS: { id: Page; label: string; icon: typeof LayoutDashboard; group: string }[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'Overview' },
-  { id: 'console', label: 'Console', icon: Terminal, group: 'Overview' },
-  { id: 'network', label: 'Network', icon: Network, group: 'Recon' },
-  { id: 'credentials', label: 'Credentials', icon: KeyRound, group: 'Recon' },
-  { id: 'loot', label: 'Loot', icon: FolderOpen, group: 'Recon' },
-  { id: 'toollog', label: 'MCP Tools', icon: Wrench, group: 'System' },
-  { id: 'config', label: 'Config', icon: Settings, group: 'System' },
+const NAV_ITEMS: { id: Page; label: string; icon: typeof LayoutDashboard; group: string; desc: string }[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'Overview', desc: 'Status overview and controls' },
+  { id: 'console', label: 'Console', icon: Terminal, group: 'Overview', desc: 'Live Bjorn logs' },
+  { id: 'network', label: 'Network', icon: Network, group: 'Recon', desc: 'Discovered hosts and manual attacks' },
+  { id: 'credentials', label: 'Credentials', icon: KeyRound, group: 'Recon', desc: 'Cracked passwords by service' },
+  { id: 'loot', label: 'Loot', icon: FolderOpen, group: 'Recon', desc: 'Stolen files from targets' },
+  { id: 'wifi', label: 'WiFi Tools', icon: Wifi, group: 'Attack', desc: '13 WiFi security testing tools' },
+  { id: 'toollog', label: 'MCP Tools', icon: Wrench, group: 'System', desc: 'MCP tool call history' },
+  { id: 'config', label: 'Config', icon: Settings, group: 'System', desc: 'Settings, WiFi, system management' },
 ]
 
 interface Props {
@@ -70,7 +72,7 @@ export function AppSidebar({ currentPage, onNavigate }: Props) {
                   <SidebarMenuButton
                     isActive={currentPage === item.id}
                     onClick={() => onNavigate(item.id)}
-                    tooltip={item.label}
+                    tooltip={`${item.label} — ${item.desc}`}
                     className="cursor-pointer"
                   >
                     <item.icon className="size-4" />
