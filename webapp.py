@@ -177,6 +177,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
+class ReusableTCPServer(socketserver.TCPServer):
+    allow_reuse_address = True
+
 class WebThread(threading.Thread):
     def __init__(self, handler_class=CustomHandler, port=8000):
         super().__init__()
@@ -188,7 +191,7 @@ class WebThread(threading.Thread):
     def run(self):
         while not self.shared_data.webapp_should_exit:
             try:
-                with socketserver.TCPServer(
+                with ReusableTCPServer(
                     ("", self.port), self.handler_class
                 ) as httpd:
                     self.httpd = httpd
