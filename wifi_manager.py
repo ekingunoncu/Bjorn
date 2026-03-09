@@ -1,8 +1,9 @@
 """
 WiFi security testing module for Bjorn.
 
-Provides comprehensive WiFi security operations using an external
-USB adapter (wlan1). NEVER touches wlan0 (system connectivity).
+Provides comprehensive WiFi security operations using wlan0.
+When USB gadget mode is active, usb0 handles connectivity and
+wlan0 is free for monitor mode and WiFi attacks.
 
 Uses aircrack-ng suite, reaver, hcxdumptool, hostapd, dnsmasq,
 and mdk4 for offensive WiFi operations.
@@ -25,8 +26,8 @@ from logger import Logger
 
 logger = Logger(name="wifi_manager.py", level=__import__('logging').DEBUG)
 
-IFACE = "wlan1"
-BLOCKED_IFACES = {"wlan0", "eth0", "usb0"}
+IFACE = "wlan0"
+BLOCKED_IFACES = {"eth0", "usb0"}
 MONITOR_SUFFIXES = ("mon",)
 
 WIFI_BASE = os.path.join(
