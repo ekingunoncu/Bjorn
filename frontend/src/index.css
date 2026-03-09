@@ -126,4 +126,8 @@
   html {
     @apply font-sans;
     }
+  button, [role="button"], a, select, input[type="checkbox"], input[type="radio"],
+  label[for], summary, [tabindex]:not([tabindex="-1"]) {
+    cursor: pointer;
+  }
 }

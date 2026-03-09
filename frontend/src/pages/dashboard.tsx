@@ -48,6 +48,7 @@ export function DashboardPage() {
     }
   }
 
+  const firstLoad = loading && !status && !error
   const orchRunning = status?.bjorn_status === 'Running'
 
   return (
@@ -88,7 +89,7 @@ export function DashboardPage() {
                 </CardHeader>
                 <CardContent className="px-4 pb-3">
                   <div className="text-2xl font-bold tabular-nums">
-                    {loading ? '—' : String(status?.[key] ?? 0)}
+                    {firstLoad ? '—' : String(status?.[key] ?? 0)}
                   </div>
                 </CardContent>
               </Card>
@@ -102,7 +103,7 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent className="px-4 pb-3">
             <div className="text-2xl font-bold tabular-nums">
-              {loading ? '—' : `${status?.level ?? 0} / ${status?.coins ?? 0}`}
+              {firstLoad ? '—' : `${status?.level ?? 0} / ${status?.coins ?? 0}`}
             </div>
           </CardContent>
         </Card>

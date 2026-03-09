@@ -815,25 +815,29 @@ method=auto
         """Return Bjorn status as JSON."""
         try:
             status = get_status()
+            # Convert numpy types to native Python types before serializing
+            clean = {}
+            for k, v in status.items():
+                if hasattr(v, 'item'):
+                    clean[k] = v.item()
+                elif isinstance(v, (list, tuple)):
+                    clean[k] = [x.item() if hasattr(x, 'item') else x for x in v]
+                else:
+                    clean[k] = v
+            body = json.dumps(clean).encode('utf-8')
             handler.send_response(200)
             handler.send_header("Content-type", "application/json")
+            handler.send_header("Content-Length", str(len(body)))
             handler.end_headers()
-            # Convert numpy types to native Python types
-            clean = {
-                k: int(v) if hasattr(v, 'item') else v
-                for k, v in status.items()
-            }
-            handler.wfile.write(
-                json.dumps(clean).encode('utf-8')
-            )
+            handler.wfile.write(body)
         except Exception as e:
             self.logger.error(f"Error serving status: {e}")
+            body = json.dumps({"error": str(e)}).encode('utf-8')
             handler.send_response(500)
             handler.send_header("Content-type", "application/json")
+            handler.send_header("Content-Length", str(len(body)))
             handler.end_headers()
-            handler.wfile.write(
-                json.dumps({"error": str(e)}).encode('utf-8')
-            )
+            handler.wfile.write(body)
 
     def handle_tool_log(self, handler):
         """Return recent MCP tool call history as JSON."""
