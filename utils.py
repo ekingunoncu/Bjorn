@@ -818,8 +818,13 @@ method=auto
             handler.send_response(200)
             handler.send_header("Content-type", "application/json")
             handler.end_headers()
+            # Convert numpy types to native Python types
+            clean = {
+                k: int(v) if hasattr(v, 'item') else v
+                for k, v in status.items()
+            }
             handler.wfile.write(
-                json.dumps(status).encode('utf-8')
+                json.dumps(clean).encode('utf-8')
             )
         except Exception as e:
             self.logger.error(f"Error serving status: {e}")
