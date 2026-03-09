@@ -76,6 +76,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.serve_file_gzipped(os.path.join(self.shared_data.webdir, 'credentials.html'), 'text/html')
         elif self.path == '/manual.html':
             self.serve_file_gzipped(os.path.join(self.shared_data.webdir, 'manual.html'), 'text/html')
+        elif self.path == '/chat.html':
+            self.serve_file_gzipped(os.path.join(self.shared_data.webdir, 'chat.html'), 'text/html')
         elif self.path == '/load_config':
             self.web_utils.serve_current_config(self)
         elif self.path == '/restore_default_config':
@@ -146,6 +148,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.web_utils.start_orchestrator(self)
         elif self.path == '/execute_manual_attack':  # New route to execute a manual attack
             self.web_utils.execute_manual_attack(self)
+        elif self.path == '/chat':
+            self.web_utils.handle_chat(self)
+        elif self.path == '/chat_clear':
+            self.web_utils.handle_chat_clear(self)
         else:
             self.send_response(404)
             self.end_headers()

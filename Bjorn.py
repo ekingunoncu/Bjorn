@@ -27,6 +27,7 @@ from comment import Commentaireia
 from webapp import web_thread, handle_exit_web
 from orchestrator import Orchestrator
 from logger import Logger
+from mcp_server import MCPThread, MCP_AVAILABLE
 
 logger = Logger(name="Bjorn.py", level=logging.DEBUG)
 
@@ -110,13 +111,15 @@ class Bjorn:
         display_thread.start()
         return display_thread
 
-def handle_exit(sig, frame, display_thread, bjorn_thread, web_thread):
-    """Handles the termination of the main, display, and web threads."""
+def handle_exit(sig, frame, display_thread, bjorn_thread, web_thread, mcp_thread=None):
+    """Handles the termination of the main, display, web, and MCP threads."""
     shared_data.should_exit = True
     shared_data.orchestrator_should_exit = True  # Ensure orchestrator stops
     shared_data.display_should_exit = True  # Ensure display stops
     shared_data.webapp_should_exit = True  # Ensure web server stops
     handle_exit_display(sig, frame, display_thread)
+    if mcp_thread and mcp_thread.is_alive():
+        mcp_thread.shutdown()
     if display_thread.is_alive():
         display_thread.join()
     if bjorn_thread.is_alive():
@@ -149,8 +152,15 @@ if __name__ == "__main__":
             logger.info("Starting the web server...")
             web_thread.start()
 
-        signal.signal(signal.SIGINT, lambda sig, frame: handle_exit(sig, frame, display_thread, bjorn_thread, web_thread))
-        signal.signal(signal.SIGTERM, lambda sig, frame: handle_exit(sig, frame, display_thread, bjorn_thread, web_thread))
+        mcp_thread = None
+        if MCP_AVAILABLE:
+            mcp_port = shared_data.config.get("mcp_port", 8081)
+            logger.info(f"Starting MCP SSE server on port {mcp_port}...")
+            mcp_thread = MCPThread(port=mcp_port)
+            mcp_thread.start()
+
+        signal.signal(signal.SIGINT, lambda sig, frame: handle_exit(sig, frame, display_thread, bjorn_thread, web_thread, mcp_thread))
+        signal.signal(signal.SIGTERM, lambda sig, frame: handle_exit(sig, frame, display_thread, bjorn_thread, web_thread, mcp_thread))
 
     except Exception as e:
         logger.error(f"An exception occurred during thread start: {e}")

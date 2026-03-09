@@ -15,7 +15,7 @@ from datetime import datetime
 from logger import Logger
 from urllib.parse import unquote
 from actions.nmap_vuln_scanner import NmapVulnScanner
-
+from chat_handler import chat_handler
 
 
 logger = Logger(name="utils.py", level=logging.DEBUG)
@@ -811,5 +811,46 @@ method=auto
             handler.end_headers()
             handler.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
 
+    def handle_chat(self, handler):
+        """Handle chat message from the web UI."""
+        try:
+            content_length = int(handler.headers['Content-Length'])
+            post_data = handler.rfile.read(content_length).decode('utf-8')
+            params = json.loads(post_data)
+            user_message = params.get('message', '')
+
+            if not user_message:
+                handler.send_response(400)
+                handler.send_header("Content-type", "application/json")
+                handler.end_headers()
+                handler.wfile.write(json.dumps({"error": "Empty message"}).encode('utf-8'))
+                return
+
+            result = chat_handler.process_message(user_message)
+
+            handler.send_response(200)
+            handler.send_header("Content-type", "application/json")
+            handler.end_headers()
+            handler.wfile.write(json.dumps(result).encode('utf-8'))
+        except Exception as e:
+            self.logger.error(f"Error handling chat: {e}")
+            handler.send_response(500)
+            handler.send_header("Content-type", "application/json")
+            handler.end_headers()
+            handler.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
+
+    def handle_chat_clear(self, handler):
+        """Clear chat conversation history."""
+        try:
+            result = chat_handler.clear_history()
+            handler.send_response(200)
+            handler.send_header("Content-type", "application/json")
+            handler.end_headers()
+            handler.wfile.write(json.dumps(result).encode('utf-8'))
+        except Exception as e:
+            handler.send_response(500)
+            handler.send_header("Content-type", "application/json")
+            handler.end_headers()
+            handler.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
 
 

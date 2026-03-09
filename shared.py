@@ -164,6 +164,10 @@ class SharedData:
             "timewait_ftp": 0,
             "timewait_sql": 0,
             "timewait_rdp": 0,
+
+            "__title_chat__": "Chat & MCP Settings",
+            "anthropic_api_key": "",
+            "mcp_port": 8081,
         }
 
     def update_mac_blacklist(self):
