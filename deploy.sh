@@ -10,8 +10,8 @@ echo "Deploying to $PI_HOST..."
 # Push local changes
 git push origin main 2>/dev/null
 
-# Pull on Pi and restart service
-ssh $PI_HOST "cd $REMOTE_DIR && git pull && sudo systemctl restart bjorn.service"
+# Pull on Pi, fix permissions, restart service
+ssh $PI_HOST "cd $REMOTE_DIR && git stash -q 2>/dev/null; git pull && chmod +x kill_port_8000.sh deploy.sh 2>/dev/null && sudo systemctl restart bjorn.service"
 
 echo "Waiting for Bjorn to start..."
 sleep 5
