@@ -15,7 +15,7 @@ from datetime import datetime
 from logger import Logger
 from urllib.parse import unquote
 from actions.nmap_vuln_scanner import NmapVulnScanner
-from mcp_server import get_tool_call_log
+from mcp_server import get_tool_call_log, get_status
 
 
 logger = Logger(name="utils.py", level=logging.DEBUG)
@@ -810,6 +810,25 @@ method=auto
             handler.send_header("Content-type", "application/json")
             handler.end_headers()
             handler.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+
+    def handle_api_status(self, handler):
+        """Return Bjorn status as JSON."""
+        try:
+            status = get_status()
+            handler.send_response(200)
+            handler.send_header("Content-type", "application/json")
+            handler.end_headers()
+            handler.wfile.write(
+                json.dumps(status).encode('utf-8')
+            )
+        except Exception as e:
+            self.logger.error(f"Error serving status: {e}")
+            handler.send_response(500)
+            handler.send_header("Content-type", "application/json")
+            handler.end_headers()
+            handler.wfile.write(
+                json.dumps({"error": str(e)}).encode('utf-8')
+            )
 
     def handle_tool_log(self, handler):
         """Return recent MCP tool call history as JSON."""

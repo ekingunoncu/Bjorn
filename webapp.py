@@ -1,4 +1,4 @@
-#webapp.py 
+#webapp.py
 import json
 import threading
 import http.server
@@ -9,15 +9,15 @@ import signal
 import os
 import gzip
 import io
+import mimetypes
 from logger import Logger
 from init_shared import shared_data
 from utils import WebUtils
 
-# Initialize the logger
 logger = Logger(name="webapp.py", level=logging.DEBUG)
 
-# Set the path to the favicon
-favicon_path = os.path.join(shared_data.webdir, '/images/favicon.ico')
+# SPA build directory
+SPA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web', 'dist')
 
 class CustomHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -26,7 +26,6 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, **kwargs)
 
     def log_message(self, format, *args):
-        # Override to suppress logging of GET requests.
         if 'GET' not in format % args:
             logger.info("%s - - [%s] %s\n" %
                         (self.client_address[0],
@@ -34,14 +33,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                          format % args))
 
     def gzip_encode(self, content):
-        """Gzip compress the given content."""
         out = io.BytesIO()
         with gzip.GzipFile(fileobj=out, mode="w") as f:
             f.write(content)
         return out.getvalue()
 
     def send_gzipped_response(self, content, content_type):
-        """Send a gzipped HTTP response."""
         gzipped_content = self.gzip_encode(content)
         self.send_response(200)
         self.send_header("Content-type", content_type)
@@ -51,43 +48,46 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(gzipped_content)
 
     def serve_file_gzipped(self, file_path, content_type):
-        """Serve a file with gzip compression."""
         with open(file_path, 'rb') as file:
             content = file.read()
         self.send_gzipped_response(content, content_type)
 
+    def _serve_spa_file(self, rel_path):
+        """Serve a file from the SPA build directory."""
+        file_path = os.path.join(SPA_DIR, rel_path)
+        if os.path.isfile(file_path):
+            ctype = mimetypes.guess_type(file_path)[0] or 'application/octet-stream'
+            self.serve_file_gzipped(file_path, ctype)
+            return True
+        return False
+
+    def _serve_spa_index(self):
+        """Serve the SPA index.html for client-side routing."""
+        index = os.path.join(SPA_DIR, 'index.html')
+        if os.path.isfile(index):
+            self.serve_file_gzipped(index, 'text/html')
+            return True
+        return False
+
+    def _send_json(self, data):
+        """Send a JSON response."""
+        body = json.dumps(data).encode('utf-8')
+        self.send_response(200)
+        self.send_header("Content-type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
-        # Handle GET requests. Serve the HTML interface and the EPD image.
-        if self.path == '/index.html' or self.path == '/':
-            self.serve_file_gzipped(os.path.join(self.shared_data.webdir, 'index.html'), 'text/html')
-        elif self.path == '/config.html':
-            self.serve_file_gzipped(os.path.join(self.shared_data.webdir, 'config.html'), 'text/html')
-        elif self.path == '/actions.html':
-            self.serve_file_gzipped(os.path.join(self.shared_data.webdir, 'actions.html'), 'text/html')
-        elif self.path == '/network.html':
-            self.serve_file_gzipped(os.path.join(self.shared_data.webdir, 'network.html'), 'text/html')
-        elif self.path == '/netkb.html':
-            self.serve_file_gzipped(os.path.join(self.shared_data.webdir, 'netkb.html'), 'text/html')
-        elif self.path == '/bjorn.html':
-            self.serve_file_gzipped(os.path.join(self.shared_data.webdir, 'bjorn.html'), 'text/html')
-        elif self.path == '/loot.html':
-            self.serve_file_gzipped(os.path.join(self.shared_data.webdir, 'loot.html'), 'text/html')
-        elif self.path == '/credentials.html':
-            self.serve_file_gzipped(os.path.join(self.shared_data.webdir, 'credentials.html'), 'text/html')
-        elif self.path == '/manual.html':
-            self.serve_file_gzipped(os.path.join(self.shared_data.webdir, 'manual.html'), 'text/html')
-        elif self.path == '/chat.html':
-            self.serve_file_gzipped(os.path.join(self.shared_data.webdir, 'chat.html'), 'text/html')
+        # ── API endpoints ─────────────────────────────────────
+        if self.path == '/api/status':
+            self.web_utils.handle_api_status(self)
         elif self.path == '/load_config':
             self.web_utils.serve_current_config(self)
         elif self.path == '/restore_default_config':
             self.web_utils.restore_default_config(self)
         elif self.path == '/get_web_delay':
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-            response = json.dumps({"web_delay": self.shared_data.web_delay})
-            self.wfile.write(response.encode('utf-8'))
+            self._send_json({"web_delay": self.shared_data.web_delay})
         elif self.path == '/scan_wifi':
             self.web_utils.scan_wifi(self)
         elif self.path == '/network_data':
@@ -116,17 +116,40 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.web_utils.download_backup(self)
         elif self.path == '/tool_log':
             self.web_utils.handle_tool_log(self)
+        # ── Legacy HTML pages ─────────────────────────────────
+        elif self.path.endswith('.html'):
+            legacy = os.path.join(
+                self.shared_data.webdir, os.path.basename(self.path)
+            )
+            if os.path.isfile(legacy):
+                self.serve_file_gzipped(legacy, 'text/html')
+            else:
+                self._serve_spa_index()
+        # ── SPA static assets (/assets/*.js, *.css, fonts) ───
+        elif self.path.startswith('/assets/'):
+            if not self._serve_spa_file(self.path.lstrip('/')):
+                self.send_response(404)
+                self.end_headers()
+        # ── SPA: root and all other paths → index.html ────────
+        elif self.path == '/' or self.path == '/index.html':
+            if not self._serve_spa_index():
+                # Fallback to legacy index.html
+                self.serve_file_gzipped(
+                    os.path.join(self.shared_data.webdir, 'index.html'),
+                    'text/html'
+                )
         else:
-            super().do_GET()
+            # Try SPA file first, then legacy, then SPA index
+            if not self._serve_spa_file(self.path.lstrip('/')):
+                super().do_GET()
 
     def do_POST(self):
-        # Handle POST requests for saving configuration, connecting to Wi-Fi, clearing files, rebooting, and shutting down.
         if self.path == '/save_config':
             self.web_utils.save_configuration(self)
         elif self.path == '/connect_wifi':
             self.web_utils.connect_wifi(self)
-            self.shared_data.wifichanged = True  # Set the flag when Wi-Fi is connected
-        elif self.path == '/disconnect_wifi':  # New route to disconnect Wi-Fi
+            self.shared_data.wifichanged = True
+        elif self.path == '/disconnect_wifi':
             self.web_utils.disconnect_and_clear_wifi(self)
         elif self.path == '/clear_files':
             self.web_utils.clear_files(self)
@@ -144,20 +167,17 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.web_utils.backup(self)
         elif self.path == '/restore':
             self.web_utils.restore(self)
-        elif self.path == '/stop_orchestrator':  # New route to stop the orchestrator
+        elif self.path == '/stop_orchestrator':
             self.web_utils.stop_orchestrator(self)
-        elif self.path == '/start_orchestrator':  # New route to start the orchestrator
+        elif self.path == '/start_orchestrator':
             self.web_utils.start_orchestrator(self)
-        elif self.path == '/execute_manual_attack':  # New route to execute a manual attack
+        elif self.path == '/execute_manual_attack':
             self.web_utils.execute_manual_attack(self)
         else:
             self.send_response(404)
             self.end_headers()
 
 class WebThread(threading.Thread):
-    """
-    Thread to run the web server serving the EPD display interface.
-    """
     def __init__(self, handler_class=CustomHandler, port=8000):
         super().__init__()
         self.shared_data = shared_data
@@ -166,19 +186,21 @@ class WebThread(threading.Thread):
         self.httpd = None
 
     def run(self):
-        """
-        Run the web server in a separate thread.
-        """
         while not self.shared_data.webapp_should_exit:
             try:
-                with socketserver.TCPServer(("", self.port), self.handler_class) as httpd:
+                with socketserver.TCPServer(
+                    ("", self.port), self.handler_class
+                ) as httpd:
                     self.httpd = httpd
                     logger.info(f"Serving at port {self.port}")
                     while not self.shared_data.webapp_should_exit:
                         httpd.handle_request()
             except OSError as e:
-                if e.errno == 98:  # Address already in use error
-                    logger.warning(f"Port {self.port} is in use, trying the next port...")
+                if e.errno == 98:
+                    logger.warning(
+                        f"Port {self.port} is in use, "
+                        "trying the next port..."
+                    )
                     self.port += 1
                 else:
                     logger.error(f"Error in web server: {e}")
@@ -189,35 +211,26 @@ class WebThread(threading.Thread):
                     logger.info("Web server closed.")
 
     def shutdown(self):
-        """
-        Shutdown the web server gracefully.
-        """
         if self.httpd:
             self.httpd.shutdown()
             self.httpd.server_close()
             logger.info("Web server shutdown initiated.")
 
 def handle_exit_web(signum, frame):
-    """
-    Handle exit signals to shutdown the web server cleanly.
-    """
     shared_data.webapp_should_exit = True
     if web_thread.is_alive():
         web_thread.shutdown()
-        web_thread.join()  # Wait until the web_thread is finished
+        web_thread.join()
     logger.info("Server shutting down...")
     sys.exit(0)
 
-# Initialize the web thread
 web_thread = WebThread(port=8000)
 
-# Set up signal handling for graceful shutdown
 signal.signal(signal.SIGINT, handle_exit_web)
 signal.signal(signal.SIGTERM, handle_exit_web)
 
 if __name__ == "__main__":
     try:
-        # Start the web server thread
         web_thread.start()
         logger.info("Web server thread started.")
     except Exception as e:

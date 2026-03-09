@@ -5,6 +5,9 @@
 PI_HOST="bjorn@bjorn.local"
 REMOTE_DIR="/home/bjorn/Bjorn"
 
+echo "Building frontend..."
+(cd frontend && npm run build) || { echo "Build failed!"; exit 1; }
+
 echo "Deploying to $PI_HOST..."
 
 # Push local changes

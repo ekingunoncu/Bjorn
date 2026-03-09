@@ -1121,7 +1121,6 @@ class WiFiManager:
 
         if wordlist is None:
             wordlist = shared_data.passwordsfile
-            )
         if not os.path.exists(wordlist):
             return {
                 "success": False,
