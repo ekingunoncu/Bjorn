@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "bjorn": {
+      "type": "sse",
+      "url": "http://bjorn.local:8081/sse"
+    }
+  }
+}

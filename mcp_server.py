@@ -542,9 +542,159 @@ def get_scan_results() -> dict:
         return {"error": str(exc)}
 
 
+# ── WiFi Security Tool Functions ──────────────────────────────────────────────
+# Delegate to wifi_manager singleton for all WiFi operations.
+
+try:
+    from wifi_manager import wifi_mgr
+    WIFI_AVAILABLE = True
+except Exception:
+    WIFI_AVAILABLE = False
+    logger.warning("wifi_manager not available. WiFi tools disabled.")
+
+
+def wifi_analyze(target_bssid: str = "", channel: int = 0,
+                 scan_duration: int = 15) -> dict:
+    """Scan and analyze nearby WiFi networks for security weaknesses."""
+    if not WIFI_AVAILABLE:
+        return {"error": "WiFi manager not available"}
+    bssid = target_bssid or None
+    chan = channel or None
+    return wifi_mgr.analyze_networks(bssid, chan, scan_duration)
+
+
+def wifi_list_clients(bssid: str, channel: int,
+                      duration: int = 30) -> dict:
+    """List clients connected to a specific WiFi network."""
+    if not WIFI_AVAILABLE:
+        return {"error": "WiFi manager not available"}
+    return wifi_mgr.list_clients(bssid, channel, duration)
+
+
+def wifi_deauth(bssid: str, channel: int,
+                client_mac: str = "", count: int = 10) -> dict:
+    """Send deauth packets to disconnect clients from a network."""
+    if not WIFI_AVAILABLE:
+        return {"error": "WiFi manager not available"}
+    mac = client_mac or None
+    return wifi_mgr.send_deauth(bssid, channel, mac, count)
+
+
+def wifi_capture_handshake(bssid: str, channel: int,
+                           client_mac: str = "",
+                           deauth_count: int = 5,
+                           timeout: int = 120) -> dict:
+    """Capture WPA/WPA2 4-way handshake from a target network."""
+    if not WIFI_AVAILABLE:
+        return {"error": "WiFi manager not available"}
+    mac = client_mac or None
+    return wifi_mgr.capture_handshake(
+        bssid, channel, mac, deauth_count, timeout
+    )
+
+
+def wifi_capture_pmkid(bssid: str, channel: int,
+                       timeout: int = 60) -> dict:
+    """Capture PMKID hash from AP (clientless, stealthier method)."""
+    if not WIFI_AVAILABLE:
+        return {"error": "WiFi manager not available"}
+    return wifi_mgr.capture_pmkid(bssid, channel, timeout)
+
+
+def wifi_crack_wpa(capture_file: str,
+                   wordlist: str = "") -> dict:
+    """Run wordlist attack against captured WPA handshake or PMKID."""
+    if not WIFI_AVAILABLE:
+        return {"error": "WiFi manager not available"}
+    wl = wordlist or None
+    return wifi_mgr.crack_wpa(capture_file, wl)
+
+
+def wifi_crack_wps(bssid: str, channel: int,
+                   timeout: int = 600,
+                   pixie_dust: bool = True) -> dict:
+    """Brute-force WPS PIN on target access point."""
+    if not WIFI_AVAILABLE:
+        return {"error": "WiFi manager not available"}
+    return wifi_mgr.crack_wps(bssid, channel, timeout, pixie_dust)
+
+
+def wifi_crack_wep(bssid: str, channel: int,
+                   timeout: int = 300) -> dict:
+    """Crack WEP encryption on a target network."""
+    if not WIFI_AVAILABLE:
+        return {"error": "WiFi manager not available"}
+    return wifi_mgr.crack_wep(bssid, channel, timeout)
+
+
+def wifi_evil_twin(ssid: str, channel: int,
+                   duration: int = 300) -> dict:
+    """Create fake AP clone with captive portal for credential capture."""
+    if not WIFI_AVAILABLE:
+        return {"error": "WiFi manager not available"}
+    return wifi_mgr.evil_twin(ssid, channel, duration=duration)
+
+
+def wifi_karma_attack(duration: int = 300) -> dict:
+    """Run KARMA attack responding to all client probe requests."""
+    if not WIFI_AVAILABLE:
+        return {"error": "WiFi manager not available"}
+    return wifi_mgr.karma_attack(duration)
+
+
+def wifi_get_handshakes() -> dict:
+    """List all captured handshake and PMKID files."""
+    if not WIFI_AVAILABLE:
+        return {"error": "WiFi manager not available"}
+    return wifi_mgr.get_handshakes()
+
+
+def wifi_get_cracked() -> dict:
+    """List all cracked WiFi passwords."""
+    if not WIFI_AVAILABLE:
+        return {"error": "WiFi manager not available"}
+    return wifi_mgr.get_cracked()
+
+
+def wifi_security_report() -> dict:
+    """Generate full WiFi security assessment report."""
+    if not WIFI_AVAILABLE:
+        return {"error": "WiFi manager not available"}
+    return wifi_mgr.security_report()
+
+
+# ── Tool Call Log ─────────────────────────────────────────────────────────────
+# Tracks recent MCP tool calls for the web UI viewer.
+
+_tool_call_log = []
+_tool_call_log_lock = threading.Lock()
+_MAX_LOG_ENTRIES = 100
+
+
+def _log_tool_call(name, args, result):
+    """Record a tool call for the web UI."""
+    entry = {
+        "timestamp": datetime.now().strftime("%H:%M:%S"),
+        "tool": name,
+        "args": args,
+        "result_preview": str(result)[:500],
+        "success": "error" not in str(result).lower()[:100]
+    }
+    with _tool_call_log_lock:
+        _tool_call_log.append(entry)
+        if len(_tool_call_log) > _MAX_LOG_ENTRIES:
+            _tool_call_log.pop(0)
+
+
+def get_tool_call_log() -> list:
+    """Get recent tool call history for the web UI."""
+    with _tool_call_log_lock:
+        return list(_tool_call_log)
+
+
 # ── Tool Registry ─────────────────────────────────────────────────────────────
 # Single source of truth for all tool metadata.
-# Used by MCP server (auto-registration) and chat handler (Anthropic API schemas).
+# Used by MCP server (auto-registration) and web UI tool viewer.
 
 _TOOL_DEFS = [
     {"name": "get_status", "func": get_status,
@@ -633,6 +783,87 @@ _TOOL_DEFS = [
     {"name": "get_scan_results", "func": get_scan_results,
      "description": "Get the latest network scan results (port scan table)",
      "params": {}},
+    # ── WiFi Security Tools ──
+    {"name": "wifi_analyze", "func": wifi_analyze,
+     "description": "Scan and analyze nearby WiFi networks for security weaknesses",
+     "params": {
+         "target_bssid": {"type": "string", "description": "Target AP BSSID to focus on (optional)", "required": False},
+         "channel": {"type": "integer", "description": "WiFi channel to scan (0=all)", "required": False},
+         "scan_duration": {"type": "integer", "description": "Scan duration in seconds (default 15)", "required": False},
+     }},
+    {"name": "wifi_list_clients", "func": wifi_list_clients,
+     "description": "List clients connected to a specific WiFi network",
+     "params": {
+         "bssid": {"type": "string", "description": "Target AP BSSID", "required": True},
+         "channel": {"type": "integer", "description": "WiFi channel of the AP", "required": True},
+         "duration": {"type": "integer", "description": "Capture duration in seconds (default 30)", "required": False},
+     }},
+    {"name": "wifi_deauth", "func": wifi_deauth,
+     "description": "Send deauth packets to disconnect clients from a network",
+     "params": {
+         "bssid": {"type": "string", "description": "Target AP BSSID", "required": True},
+         "channel": {"type": "integer", "description": "WiFi channel of the AP", "required": True},
+         "client_mac": {"type": "string", "description": "Target client MAC (empty=broadcast)", "required": False},
+         "count": {"type": "integer", "description": "Number of deauth packets (default 10)", "required": False},
+     }},
+    {"name": "wifi_capture_handshake", "func": wifi_capture_handshake,
+     "description": "Capture WPA/WPA2 4-way handshake from a target network",
+     "params": {
+         "bssid": {"type": "string", "description": "Target AP BSSID", "required": True},
+         "channel": {"type": "integer", "description": "WiFi channel of the AP", "required": True},
+         "client_mac": {"type": "string", "description": "Target client MAC (optional)", "required": False},
+         "deauth_count": {"type": "integer", "description": "Deauth packets to send (default 5)", "required": False},
+         "timeout": {"type": "integer", "description": "Capture timeout in seconds (default 120)", "required": False},
+     }},
+    {"name": "wifi_capture_pmkid", "func": wifi_capture_pmkid,
+     "description": "Capture PMKID hash from AP (clientless, stealthier method)",
+     "params": {
+         "bssid": {"type": "string", "description": "Target AP BSSID", "required": True},
+         "channel": {"type": "integer", "description": "WiFi channel of the AP", "required": True},
+         "timeout": {"type": "integer", "description": "Capture timeout in seconds (default 60)", "required": False},
+     }},
+    {"name": "wifi_crack_wpa", "func": wifi_crack_wpa,
+     "description": "Run wordlist attack against captured WPA handshake or PMKID",
+     "params": {
+         "capture_file": {"type": "string", "description": "Path to capture file (.cap or .hc22000)", "required": True},
+         "wordlist": {"type": "string", "description": "Path to wordlist (default: Bjorn passwords.txt)", "required": False},
+     }},
+    {"name": "wifi_crack_wps", "func": wifi_crack_wps,
+     "description": "Brute-force WPS PIN on target access point",
+     "params": {
+         "bssid": {"type": "string", "description": "Target AP BSSID", "required": True},
+         "channel": {"type": "integer", "description": "WiFi channel of the AP", "required": True},
+         "timeout": {"type": "integer", "description": "Timeout in seconds (default 600)", "required": False},
+         "pixie_dust": {"type": "boolean", "description": "Use Pixie Dust attack (default true)", "required": False},
+     }},
+    {"name": "wifi_crack_wep", "func": wifi_crack_wep,
+     "description": "Crack WEP encryption on a target network",
+     "params": {
+         "bssid": {"type": "string", "description": "Target AP BSSID", "required": True},
+         "channel": {"type": "integer", "description": "WiFi channel of the AP", "required": True},
+         "timeout": {"type": "integer", "description": "Timeout in seconds (default 300)", "required": False},
+     }},
+    {"name": "wifi_evil_twin", "func": wifi_evil_twin,
+     "description": "Create fake AP clone with captive portal for credential capture",
+     "params": {
+         "ssid": {"type": "string", "description": "SSID to clone", "required": True},
+         "channel": {"type": "integer", "description": "WiFi channel to operate on", "required": True},
+         "duration": {"type": "integer", "description": "Duration in seconds (default 300)", "required": False},
+     }},
+    {"name": "wifi_karma_attack", "func": wifi_karma_attack,
+     "description": "Run KARMA attack responding to all client probe requests",
+     "params": {
+         "duration": {"type": "integer", "description": "Duration in seconds (default 300)", "required": False},
+     }},
+    {"name": "wifi_get_handshakes", "func": wifi_get_handshakes,
+     "description": "List all captured handshake and PMKID files",
+     "params": {}},
+    {"name": "wifi_get_cracked", "func": wifi_get_cracked,
+     "description": "List all cracked WiFi passwords",
+     "params": {}},
+    {"name": "wifi_security_report", "func": wifi_security_report,
+     "description": "Generate full WiFi security assessment report",
+     "params": {}},
 ]
 
 # Exported: name→function map and Anthropic API-compatible tool schemas
@@ -660,8 +891,23 @@ TOOL_SCHEMAS = [
 if MCP_AVAILABLE:
     mcp = FastMCP("bjorn")
 
+    def _make_logged_wrapper(td):
+        """Create a logging wrapper for a tool function."""
+        func = td["func"]
+        def wrapper(**kwargs):
+            result = func(**kwargs)
+            _log_tool_call(td["name"], kwargs, result)
+            return result
+        wrapper.__name__ = func.__name__
+        wrapper.__doc__ = func.__doc__
+        # Copy type hints so MCP can infer parameter schemas
+        wrapper.__annotations__ = getattr(func, '__annotations__', {})
+        import functools
+        functools.update_wrapper(wrapper, func)
+        return wrapper
+
     for _td in _TOOL_DEFS:
-        mcp.tool()(_td["func"])
+        mcp.tool()(_make_logged_wrapper(_td))
 
     @mcp.resource("bjorn://status")
     def resource_status() -> str:

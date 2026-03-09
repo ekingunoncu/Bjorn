@@ -165,8 +165,7 @@ class SharedData:
             "timewait_sql": 0,
             "timewait_rdp": 0,
 
-            "__title_chat__": "Chat & MCP Settings",
-            "anthropic_api_key": "",
+            "__title_mcp__": "MCP Settings",
             "mcp_port": 8081,
         }
 

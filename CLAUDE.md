@@ -54,10 +54,10 @@ class ClassName:
 
 Action categories: network scanning (`scanning.py`), vulnerability scanning (`nmap_vuln_scanner.py`), brute-force connectors (`ssh_connector.py`, `ftp_connector.py`, etc.), file stealing (`steal_files_ssh.py`, etc.).
 
-### MCP Server & Chat
-- **`mcp_server.py`**: MCP server exposing Bjorn tools (get_status, get_network_data, execute_action, etc.) and resources (bjorn://status, bjorn://netkb, bjorn://config). Runs embedded as SSE thread on port 8081 (configurable via `mcp_port`). Connect from Claude Desktop: `{"url": "http://<pi-ip>:8081/sse"}`. Also runnable standalone (`python mcp_server.py`, stdio).
-- **`chat_handler.py`**: AI chat backend using Anthropic API with tool use. Singleton `chat_handler` instance persists across HTTP requests. The AI can query Bjorn's state and execute actions via tool calls.
-- **Chat UI**: `web/chat.html` + `web/scripts/chat.js`. Accessible from all pages via toolbar chat button. Requires `anthropic_api_key` in config or `ANTHROPIC_API_KEY` env var.
+### MCP Server & Tool Log
+- **`mcp_server.py`**: MCP server exposing Bjorn tools (get_status, get_network_data, execute_action, wifi_analyze, etc.) and resources (bjorn://status, bjorn://netkb, bjorn://config). Runs embedded as SSE thread on port 8081 (configurable via `mcp_port`). Connect from Claude Desktop: `{"url": "http://<pi-ip>:8081/sse"}`. Also runnable standalone (`python mcp_server.py`, stdio). Includes 13 WiFi security tools via `wifi_manager.py`.
+- **`wifi_manager.py`**: WiFi security testing module (analyze, deauth, handshake capture, WPA/WPS/WEP cracking, evil twin, KARMA). Uses wlan1 (external USB adapter) only; never touches wlan0.
+- **MCP Tool Log UI**: `web/chat.html` shows recent MCP tool calls (tool name, args, result). Auto-refreshes every 5s. Accessible from toolbar.
 
 ### Data Storage
 - **`config/shared_config.json`**: All runtime settings (scan intervals, port lists, blacklists, feature flags)

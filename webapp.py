@@ -114,6 +114,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.web_utils.download_file(self)
         elif self.path.startswith('/download_backup'):
             self.web_utils.download_backup(self)
+        elif self.path == '/tool_log':
+            self.web_utils.handle_tool_log(self)
         else:
             super().do_GET()
 
@@ -148,10 +150,6 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.web_utils.start_orchestrator(self)
         elif self.path == '/execute_manual_attack':  # New route to execute a manual attack
             self.web_utils.execute_manual_attack(self)
-        elif self.path == '/chat':
-            self.web_utils.handle_chat(self)
-        elif self.path == '/chat_clear':
-            self.web_utils.handle_chat_clear(self)
         else:
             self.send_response(404)
             self.end_headers()

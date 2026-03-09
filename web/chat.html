@@ -3,11 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bjorn Cyberviking - Chat</title>
+    <title>Bjorn Cyberviking - MCP Tool Log</title>
     <link rel="icon" href="web/images/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="web/css/styles.css">
     <link rel="manifest" href="manifest.json">
-    <script src="web/scripts/chat.js" defer></script>
+    <style>
+        .tool-log-container {
+            padding: 10px;
+            height: calc(100vh - 80px);
+            overflow-y: auto;
+            background: #1a1a2e;
+        }
+        .tool-log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: #16213e;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+        .tool-log-header h2 {
+            margin: 0;
+            color: #e99f00;
+            font-size: 16px;
+        }
+        .tool-log-header .status {
+            color: #6c757d;
+            font-size: 12px;
+        }
+        .tool-entry {
+            background: #16213e;
+            border-left: 3px solid #e99f00;
+            border-radius: 0 6px 6px 0;
+            margin-bottom: 8px;
+            padding: 10px 12px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .tool-entry.error {
+            border-left-color: #dc3545;
+        }
+        .tool-entry .tool-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .tool-entry .tool-name {
+            color: #e99f00;
+            font-weight: bold;
+            font-size: 13px;
+        }
+        .tool-entry.error .tool-name {
+            color: #dc3545;
+        }
+        .tool-entry .tool-time {
+            color: #6c757d;
+            font-size: 11px;
+        }
+        .tool-entry .tool-section {
+            margin-top: 4px;
+        }
+        .tool-entry .tool-label {
+            color: #adb5bd;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .tool-entry .tool-args,
+        .tool-entry .tool-result {
+            color: #dee2e6;
+            background: #0f3460;
+            border-radius: 4px;
+            padding: 6px 8px;
+            margin-top: 2px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 11px;
+        }
+        .tool-entry .tool-result {
+            max-height: 300px;
+        }
+        .empty-state {
+            text-align: center;
+            color: #6c757d;
+            padding: 60px 20px;
+            font-size: 14px;
+        }
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+        .refresh-btn {
+            background: #e99f00;
+            color: #1a1a2e;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .refresh-btn:hover {
+            background: #ffa500;
+        }
+        .badge {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+            margin-left: 6px;
+        }
+        .badge.ok { background: #28a745; color: white; }
+        .badge.fail { background: #dc3545; color: white; }
+    </style>
 </head>
 
 <body>
@@ -30,26 +143,97 @@
         <button type="button" onclick="window.location.href='/loot.html'" title="Loot">
             <img src="/web/images/loot_icon.png" alt="Icon_loot" style="height: 50px;">
         </button>
-        <button type="button" onclick="window.location.href='/chat.html'" title="Chat" style="background-color: #e99f00;">
-            <img src="/web/images/chat_icon.png" alt="Chat" style="height: 50px;">
+        <button type="button" onclick="window.location.href='/chat.html'" title="MCP Log" style="background-color: #e99f00;">
+            <img src="/web/images/chat_icon.png" alt="MCP Log" style="height: 50px;">
         </button>
     </div>
 
-    <div class="chat-container">
-        <div id="chat-messages" class="chat-messages"></div>
-        <div class="chat-input-container">
-            <input type="text" id="chat-input" placeholder="Ask Bjorn something..." autocomplete="off">
-            <button id="chat-send" onclick="sendMessage()" title="Send">
-                <svg viewBox="0 0 24 24" fill="white" style="height: 24px;">
-                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                </svg>
-            </button>
-            <button id="chat-clear" onclick="clearChat()" title="Clear conversation">
-                <svg viewBox="0 0 24 24" fill="white" style="height: 24px;">
-                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                </svg>
-            </button>
+    <div class="tool-log-container" id="tool-log-container">
+        <div class="tool-log-header">
+            <h2>MCP Tool Calls</h2>
+            <div>
+                <span class="status" id="log-count">0 calls</span>
+                <button class="refresh-btn" onclick="fetchToolLog()">Refresh</button>
+            </div>
+        </div>
+        <div id="tool-log-entries">
+            <div class="empty-state">
+                <div class="icon">&#9881;</div>
+                <div>No MCP tool calls yet.</div>
+                <div style="margin-top: 8px; font-size: 12px;">
+                    Connect an MCP client (Claude Code / Claude Desktop) and call tools to see them here.
+                </div>
+            </div>
         </div>
     </div>
+
+    <script>
+        let autoRefresh = null;
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function formatArgs(args) {
+            if (!args || Object.keys(args).length === 0) return '(no args)';
+            return JSON.stringify(args, null, 2);
+        }
+
+        function renderEntry(entry) {
+            const cls = entry.success ? '' : ' error';
+            const badge = entry.success
+                ? '<span class="badge ok">OK</span>'
+                : '<span class="badge fail">ERR</span>';
+            return `
+                <div class="tool-entry${cls}">
+                    <div class="tool-header">
+                        <span class="tool-name">${escapeHtml(entry.tool)}${badge}</span>
+                        <span class="tool-time">${escapeHtml(entry.timestamp)}</span>
+                    </div>
+                    <div class="tool-section">
+                        <div class="tool-label">Arguments</div>
+                        <div class="tool-args">${escapeHtml(formatArgs(entry.args))}</div>
+                    </div>
+                    <div class="tool-section">
+                        <div class="tool-label">Result</div>
+                        <div class="tool-result">${escapeHtml(entry.result_preview)}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function fetchToolLog() {
+            fetch('/tool_log')
+                .then(r => r.json())
+                .then(data => {
+                    const container = document.getElementById('tool-log-entries');
+                    const countEl = document.getElementById('log-count');
+                    countEl.textContent = data.length + ' call' + (data.length !== 1 ? 's' : '');
+
+                    if (data.length === 0) {
+                        container.innerHTML = `
+                            <div class="empty-state">
+                                <div class="icon">&#9881;</div>
+                                <div>No MCP tool calls yet.</div>
+                                <div style="margin-top: 8px; font-size: 12px;">
+                                    Connect an MCP client and call tools to see them here.
+                                </div>
+                            </div>`;
+                        return;
+                    }
+
+                    // Show newest first
+                    container.innerHTML = data.slice().reverse().map(renderEntry).join('');
+                })
+                .catch(err => console.error('Error fetching tool log:', err));
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchToolLog();
+            autoRefresh = setInterval(fetchToolLog, 5000);
+        });
+    </script>
 </body>
 </html>
