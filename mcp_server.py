@@ -658,7 +658,7 @@ TOOL_SCHEMAS = [
 # ── MCP Server Registration ──────────────────────────────────────────────────
 
 if MCP_AVAILABLE:
-    mcp = FastMCP("bjorn", description="Bjorn CyberViking - Autonomous Network Security Tool")
+    mcp = FastMCP("bjorn")
 
     for _td in _TOOL_DEFS:
         mcp.tool()(_td["func"])
