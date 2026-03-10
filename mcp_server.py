@@ -551,7 +551,7 @@ try:
     logger.info("WiFi manager loaded successfully")
 except Exception as exc:
     WIFI_AVAILABLE = False
-    logger.warning("wifi_manager not available: %s", exc, exc_info=True)
+    logger.warning(f"wifi_manager not available: {exc}")
 
 
 def wifi_analyze(target_bssid: str = "", channel: int = 0,

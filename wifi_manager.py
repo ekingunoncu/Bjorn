@@ -138,7 +138,7 @@ class WiFiManager:
         self._evil_twin_running = False
         self._evil_twin_server = None
         self._ensure_dirs()
-        logger.info("WiFiManager initialized (iface=%s)", IFACE)
+        logger.info(f"WiFiManager initialized (iface={IFACE})")
 
     # ------------------------------------------------------------------
     # Infrastructure (private)
@@ -163,7 +163,7 @@ class WiFiManager:
             Tuple of (returncode, stdout, stderr).
         """
         cmd_str = " ".join(cmd) if isinstance(cmd, list) else cmd
-        logger.debug("Running: %s", cmd_str)
+        logger.debug(f"Running: {cmd_str}")
         try:
             proc = subprocess.run(
                 cmd,
@@ -173,7 +173,7 @@ class WiFiManager:
             )
             return proc.returncode, proc.stdout, proc.stderr
         except subprocess.TimeoutExpired:
-            logger.warning("Command timed out: %s", cmd_str)
+            logger.warning(f"Command timed out: {cmd_str}")
             return -1, "", "Command timed out"
         except FileNotFoundError:
             tool = cmd[0] if isinstance(cmd, list) else cmd
@@ -192,7 +192,7 @@ class WiFiManager:
             subprocess.Popen or None on failure.
         """
         cmd_str = " ".join(cmd) if isinstance(cmd, list) else cmd
-        logger.debug("Starting background: %s", cmd_str)
+        logger.debug(f"Starting background: {cmd_str}")
         try:
             stdout = None
             fh = None
@@ -210,7 +210,7 @@ class WiFiManager:
             return proc
         except FileNotFoundError:
             tool = cmd[0] if isinstance(cmd, list) else cmd
-            logger.warning("Tool not installed: %s", tool)
+            logger.warning(f"Tool not installed: {tool}")
             if fh:
                 fh.close()
             return None
@@ -1426,8 +1426,7 @@ class WiFiManager:
             self._append_cracked(
                 bssid, "", "WEP", key, "wep"
             )
-            logger.info("WEP key cracked for %s: %s",
-                        bssid, key)
+            logger.info(f"WEP key cracked for {bssid}: {key}")
             return {
                 "success": True,
                 "bssid": bssid,
