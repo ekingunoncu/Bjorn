@@ -891,10 +891,14 @@ TOOL_SCHEMAS = [
 if MCP_AVAILABLE:
     mcp = FastMCP("bjorn")
 
-    # Register tools directly (no wrapper) - FastMCP needs the original
-    # function signature for proper parameter schema inference.
+    # Register tools - explicitly set __signature__ so FastMCP can
+    # infer parameter schemas from plain functions.
+    import inspect
     for _td in _TOOL_DEFS:
-        mcp.tool(name=_td["name"], description=_td["description"])(_td["func"])
+        _fn = _td["func"]
+        if not hasattr(_fn, "__signature__"):
+            _fn.__signature__ = inspect.signature(_fn)
+        mcp.tool(name=_td["name"], description=_td["description"])(_fn)
 
     @mcp.resource("bjorn://status")
     def resource_status() -> str:
