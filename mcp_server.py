@@ -548,9 +548,10 @@ def get_scan_results() -> dict:
 try:
     from wifi_manager import wifi_mgr
     WIFI_AVAILABLE = True
-except Exception:
+    logger.info("WiFi manager loaded successfully")
+except Exception as exc:
     WIFI_AVAILABLE = False
-    logger.warning("wifi_manager not available. WiFi tools disabled.")
+    logger.warning("wifi_manager not available: %s", exc, exc_info=True)
 
 
 def wifi_analyze(target_bssid: str = "", channel: int = 0,
