@@ -554,57 +554,136 @@ except Exception as exc:
     logger.warning(f"wifi_manager not available: {exc}")
 
 
+# ── Autonomous WiFi Task System ──────────────────────────────────────────────
+# Monitor-mode tools disconnect WiFi, so MCP can't return results in real-time.
+# Solution: run the operation in a background thread, reconnect WiFi after, and
+# store results. The tool returns immediately with a task_id. Use
+# wifi_get_task_result(task_id) to poll for the result once WiFi is back.
+
+import subprocess as _sp
+
+_wifi_tasks = {}
+_wifi_tasks_lock = threading.Lock()
+
+
+def _reconnect_wifi(timeout=30):
+    """Reconnect WiFi after monitor mode by restarting NetworkManager."""
+    try:
+        _sp.run(["systemctl", "restart", "NetworkManager"],
+                timeout=15, capture_output=True)
+        # Wait for connection
+        for _ in range(timeout):
+            r = _sp.run(["nmcli", "-t", "-f", "STATE", "general"],
+                        timeout=5, capture_output=True, text=True)
+            if "connected" in r.stdout.lower():
+                return True
+            time.sleep(1)
+    except Exception:
+        pass
+    return False
+
+
+def _run_wifi_task(task_id, func, kwargs):
+    """Run a WiFi operation in background, reconnect WiFi, store result."""
+    try:
+        result = func(**kwargs)
+    except Exception as exc:
+        result = {"success": False, "error": str(exc)}
+    # Reconnect WiFi
+    _reconnect_wifi()
+    with _wifi_tasks_lock:
+        _wifi_tasks[task_id] = {
+            "status": "completed",
+            "result": result,
+            "completed_at": datetime.now().isoformat()
+        }
+
+
+def _start_wifi_task(func, kwargs):
+    """Start a WiFi task in background, return task info immediately."""
+    task_id = f"wifi-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    with _wifi_tasks_lock:
+        _wifi_tasks[task_id] = {"status": "running", "started_at": datetime.now().isoformat()}
+    t = threading.Thread(target=_run_wifi_task, args=(task_id, func, kwargs), daemon=True)
+    t.start()
+    return {
+        "status": "task_started",
+        "task_id": task_id,
+        "message": "WiFi operation running in background. WiFi will disconnect "
+                   "temporarily. Use wifi_get_task_result(task_id) to get the "
+                   "result after WiFi reconnects (typically 30-60 seconds)."
+    }
+
+
+def wifi_get_task_result(task_id: str) -> dict:
+    """Get the result of a background WiFi task by its task_id."""
+    with _wifi_tasks_lock:
+        task = _wifi_tasks.get(task_id)
+    if not task:
+        return {"error": f"No task found with id: {task_id}"}
+    return task
+
+
 def wifi_analyze(target_bssid: str = "", channel: int = 0,
                  scan_duration: int = 15) -> dict:
-    """Scan and analyze nearby WiFi networks for security weaknesses."""
+    """Scan and analyze nearby WiFi networks. Returns a task_id since WiFi will disconnect during scan. Poll wifi_get_task_result(task_id) for results."""
     if not WIFI_AVAILABLE:
         return {"error": "WiFi manager not available"}
     bssid = target_bssid or None
     chan = channel or None
-    return wifi_mgr.analyze_networks(bssid, chan, scan_duration)
+    return _start_wifi_task(
+        lambda bssid=bssid, chan=chan, dur=scan_duration: wifi_mgr.analyze_networks(bssid, chan, dur),
+        {}
+    )
 
 
 def wifi_list_clients(bssid: str, channel: int,
                       duration: int = 30) -> dict:
-    """List clients connected to a specific WiFi network."""
+    """List clients connected to a WiFi network. Returns a task_id (WiFi disconnects during scan)."""
     if not WIFI_AVAILABLE:
         return {"error": "WiFi manager not available"}
-    return wifi_mgr.list_clients(bssid, channel, duration)
+    return _start_wifi_task(
+        lambda: wifi_mgr.list_clients(bssid, channel, duration), {}
+    )
 
 
 def wifi_deauth(bssid: str, channel: int,
                 client_mac: str = "", count: int = 10) -> dict:
-    """Send deauth packets to disconnect clients from a network."""
+    """Send deauth packets. Returns a task_id (WiFi disconnects during operation)."""
     if not WIFI_AVAILABLE:
         return {"error": "WiFi manager not available"}
     mac = client_mac or None
-    return wifi_mgr.send_deauth(bssid, channel, mac, count)
+    return _start_wifi_task(
+        lambda: wifi_mgr.send_deauth(bssid, channel, mac, count), {}
+    )
 
 
 def wifi_capture_handshake(bssid: str, channel: int,
                            client_mac: str = "",
                            deauth_count: int = 5,
                            timeout: int = 120) -> dict:
-    """Capture WPA/WPA2 4-way handshake from a target network."""
+    """Capture WPA handshake. Returns a task_id (WiFi disconnects during capture)."""
     if not WIFI_AVAILABLE:
         return {"error": "WiFi manager not available"}
     mac = client_mac or None
-    return wifi_mgr.capture_handshake(
-        bssid, channel, mac, deauth_count, timeout
+    return _start_wifi_task(
+        lambda: wifi_mgr.capture_handshake(bssid, channel, mac, deauth_count, timeout), {}
     )
 
 
 def wifi_capture_pmkid(bssid: str, channel: int,
                        timeout: int = 60) -> dict:
-    """Capture PMKID hash from AP (clientless, stealthier method)."""
+    """Capture PMKID hash. Returns a task_id (WiFi disconnects during capture)."""
     if not WIFI_AVAILABLE:
         return {"error": "WiFi manager not available"}
-    return wifi_mgr.capture_pmkid(bssid, channel, timeout)
+    return _start_wifi_task(
+        lambda: wifi_mgr.capture_pmkid(bssid, channel, timeout), {}
+    )
 
 
 def wifi_crack_wpa(capture_file: str,
                    wordlist: str = "") -> dict:
-    """Run wordlist attack against captured WPA handshake or PMKID."""
+    """Run wordlist attack against captured WPA handshake or PMKID. Runs locally, no WiFi disconnect."""
     if not WIFI_AVAILABLE:
         return {"error": "WiFi manager not available"}
     wl = wordlist or None
@@ -614,51 +693,59 @@ def wifi_crack_wpa(capture_file: str,
 def wifi_crack_wps(bssid: str, channel: int,
                    timeout: int = 600,
                    pixie_dust: bool = True) -> dict:
-    """Brute-force WPS PIN on target access point."""
+    """Brute-force WPS PIN. Returns a task_id (WiFi disconnects during attack)."""
     if not WIFI_AVAILABLE:
         return {"error": "WiFi manager not available"}
-    return wifi_mgr.crack_wps(bssid, channel, timeout, pixie_dust)
+    return _start_wifi_task(
+        lambda: wifi_mgr.crack_wps(bssid, channel, timeout, pixie_dust), {}
+    )
 
 
 def wifi_crack_wep(bssid: str, channel: int,
                    timeout: int = 300) -> dict:
-    """Crack WEP encryption on a target network."""
+    """Crack WEP encryption. Returns a task_id (WiFi disconnects during attack)."""
     if not WIFI_AVAILABLE:
         return {"error": "WiFi manager not available"}
-    return wifi_mgr.crack_wep(bssid, channel, timeout)
+    return _start_wifi_task(
+        lambda: wifi_mgr.crack_wep(bssid, channel, timeout), {}
+    )
 
 
 def wifi_evil_twin(ssid: str, channel: int,
                    duration: int = 300) -> dict:
-    """Create fake AP clone with captive portal for credential capture."""
+    """Create fake AP clone. Returns a task_id (WiFi disconnects during attack)."""
     if not WIFI_AVAILABLE:
         return {"error": "WiFi manager not available"}
-    return wifi_mgr.evil_twin(ssid, channel, duration=duration)
+    return _start_wifi_task(
+        lambda: wifi_mgr.evil_twin(ssid, channel, duration=duration), {}
+    )
 
 
 def wifi_karma_attack(duration: int = 300) -> dict:
-    """Run KARMA attack responding to all client probe requests."""
+    """Run KARMA attack. Returns a task_id (WiFi disconnects during attack)."""
     if not WIFI_AVAILABLE:
         return {"error": "WiFi manager not available"}
-    return wifi_mgr.karma_attack(duration)
+    return _start_wifi_task(
+        lambda: wifi_mgr.karma_attack(duration), {}
+    )
 
 
 def wifi_get_handshakes() -> dict:
-    """List all captured handshake and PMKID files."""
+    """List all captured handshake and PMKID files. No WiFi disconnect."""
     if not WIFI_AVAILABLE:
         return {"error": "WiFi manager not available"}
     return wifi_mgr.get_handshakes()
 
 
 def wifi_get_cracked() -> dict:
-    """List all cracked WiFi passwords."""
+    """List all cracked WiFi passwords. No WiFi disconnect."""
     if not WIFI_AVAILABLE:
         return {"error": "WiFi manager not available"}
     return wifi_mgr.get_cracked()
 
 
 def wifi_security_report() -> dict:
-    """Generate full WiFi security assessment report."""
+    """Generate full WiFi security assessment report. No WiFi disconnect."""
     if not WIFI_AVAILABLE:
         return {"error": "WiFi manager not available"}
     return wifi_mgr.security_report()
@@ -865,6 +952,11 @@ _TOOL_DEFS = [
     {"name": "wifi_security_report", "func": wifi_security_report,
      "description": "Generate full WiFi security assessment report",
      "params": {}},
+    {"name": "wifi_get_task_result", "func": wifi_get_task_result,
+     "description": "Get the result of a background WiFi task. Monitor-mode WiFi tools return a task_id immediately since they disconnect WiFi. Call this tool with that task_id after ~30-60 seconds to get the actual result.",
+     "params": {
+         "task_id": {"type": "string", "description": "Task ID returned by a WiFi tool", "required": True},
+     }},
 ]
 
 # Exported: name→function map and Anthropic API-compatible tool schemas
