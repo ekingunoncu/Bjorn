@@ -891,26 +891,10 @@ TOOL_SCHEMAS = [
 if MCP_AVAILABLE:
     mcp = FastMCP("bjorn")
 
-    import inspect
-    import functools
-
-    def _make_logged_wrapper(td):
-        """Create a logging wrapper for a tool function."""
-        func = td["func"]
-        name = td["name"]
-
-        @functools.wraps(func)
-        def wrapper(**kwargs):
-            result = func(**kwargs)
-            _log_tool_call(name, kwargs, result)
-            return result
-
-        # Explicitly set __signature__ so FastMCP infers the correct param schema
-        wrapper.__signature__ = inspect.signature(func)
-        return wrapper
-
+    # Register tools directly (no wrapper) - FastMCP needs the original
+    # function signature for proper parameter schema inference.
     for _td in _TOOL_DEFS:
-        mcp.tool(name=_td["name"], description=_td["description"])(_make_logged_wrapper(_td))
+        mcp.tool(name=_td["name"], description=_td["description"])(_td["func"])
 
     @mcp.resource("bjorn://status")
     def resource_status() -> str:
