@@ -113,9 +113,7 @@ def _safe(func):
         try:
             return func(self, *args, **kwargs)
         except Exception as exc:
-            logger.error(
-                "WiFiManager.%s failed: %s", func.__name__, exc
-            )
+            logger.error(f"WiFiManager.{func.__name__} failed: {exc}")
             return {
                 "success": False,
                 "error": str(exc),
@@ -365,9 +363,7 @@ class WiFiManager:
 
             self._monitor_active = True
             self._monitor_iface = iface
-            logger.info(
-                "Monitor mode enabled on %s", iface
-            )
+            logger.info(f"Monitor mode enabled on {iface}")
             return iface
 
     def _disable_monitor_mode(self):
@@ -417,9 +413,7 @@ class WiFiManager:
                     break
 
         if not os.path.exists(actual):
-            logger.warning(
-                "Airodump CSV not found: %s", filepath
-            )
+            logger.warning(f"Airodump CSV not found: {filepath}")
             return {"networks": [], "clients": []}
 
         with open(actual, "r", errors="replace") as fh:
@@ -654,9 +648,7 @@ class WiFiManager:
                 "Method": method,
                 "Timestamp": datetime.now().isoformat()
             })
-        logger.info(
-            "Cracked credential saved: %s (%s)", ssid, method
-        )
+        logger.info(f"Cracked credential saved: {ssid} ({method})")
 
     def _check_tool(self, tool_name):
         """Check if a tool is available on the system.
@@ -752,10 +744,7 @@ class WiFiManager:
             )
 
         self._disable_monitor_mode()
-        logger.info(
-            "Network scan complete: %d networks found",
-            len(networks)
-        )
+        logger.info(f"Network scan complete: {len(networks)} networks found")
         return {
             "success": True,
             "networks": networks,
@@ -808,10 +797,7 @@ class WiFiManager:
         clients = parsed.get("clients", [])
 
         self._disable_monitor_mode()
-        logger.info(
-            "Client scan for %s: %d clients found",
-            bssid, len(clients)
-        )
+        logger.info(f"Client scan for {bssid}: {len(clients)} clients found")
         return {
             "success": True,
             "bssid": bssid,
@@ -858,10 +844,7 @@ class WiFiManager:
 
         target_desc = client_mac or "broadcast"
         if code == 0:
-            logger.info(
-                "Deauth sent: %d frames to %s via %s",
-                count, target_desc, bssid
-            )
+            logger.info(f"Deauth sent: {count} frames to {target_desc} via {bssid}")
             return {
                 "success": True,
                 "bssid": bssid,
@@ -959,9 +942,7 @@ class WiFiManager:
                 )
                 if "1 handshake" in (chk_out or ""):
                     handshake_found = True
-                    logger.info(
-                        "Handshake captured for %s", bssid
-                    )
+                    logger.info(f"Handshake captured for {bssid}")
 
         self._stop_bg(dump_proc, sig=signal.SIGINT, wait=3)
         self._disable_monitor_mode()
@@ -1083,10 +1064,7 @@ class WiFiManager:
 
         if os.path.exists(hashfile) and \
                 os.path.getsize(hashfile) > 0:
-            logger.info(
-                "PMKID captured for %s: %s",
-                bssid, hashfile
-            )
+            logger.info(f"PMKID captured for {bssid}: {hashfile}")
             return {
                 "success": True,
                 "bssid": bssid,
@@ -1197,10 +1175,7 @@ class WiFiManager:
                 bssid, ssid, "WPA/WPA2",
                 password, "handshake"
             )
-            logger.info(
-                "WPA key cracked for %s: %s",
-                capture_file, password
-            )
+            logger.info(f"WPA key cracked for {capture_file}: {password}")
             return {
                 "success": True,
                 "password": password,
@@ -1306,10 +1281,7 @@ class WiFiManager:
                 bssid, "", "WPS",
                 psk or pin, "wps"
             )
-            logger.info(
-                "WPS cracked for %s: PIN=%s PSK=%s",
-                bssid, pin, psk
-            )
+            logger.info(f"WPS cracked for {bssid}: PIN={pin} PSK={psk}")
             return {
                 "success": True,
                 "bssid": bssid,
@@ -1640,9 +1612,8 @@ class WiFiManager:
                             f"{email},{password}\n"
                         )
                     logger.info(
-                        "Evil twin credential captured "
-                        "from %s",
-                        self.client_address[0]
+                        f"Evil twin credential captured "
+                        f"from {self.client_address[0]}"
                     )
 
                 self.send_response(200)
@@ -1662,9 +1633,8 @@ class WiFiManager:
         self._evil_twin_server = http_server
 
         logger.info(
-            "Evil twin started: SSID=%s channel=%d "
-            "duration=%ds",
-            ssid, channel, duration
+            f"Evil twin started: SSID={ssid} channel={channel} "
+            f"duration={duration}s"
         )
 
         # Serve for duration
@@ -1760,10 +1730,7 @@ class WiFiManager:
                     "error": "mdk4/mdk3 not installed"
                 }
 
-        logger.info(
-            "KARMA attack started for %ds on %s",
-            duration, mon_iface
-        )
+        logger.info(f"KARMA attack started for {duration}s on {mon_iface}")
 
         time.sleep(duration)
         self._stop_bg(proc, sig=signal.SIGINT, wait=3)
@@ -1861,9 +1828,7 @@ class WiFiManager:
         captures.sort(
             key=lambda x: x["modified"], reverse=True
         )
-        logger.info(
-            "Found %d capture files", len(captures)
-        )
+        logger.info(f"Found {len(captures)} capture files")
         return {
             "success": True,
             "captures": captures,
@@ -1899,9 +1864,7 @@ class WiFiManager:
                     "timestamp": row.get("Timestamp", "")
                 })
 
-        logger.info(
-            "Loaded %d cracked credentials", len(creds)
-        )
+        logger.info(f"Loaded {len(creds)} cracked credentials")
         return {
             "success": True,
             "credentials": creds,
@@ -2072,9 +2035,8 @@ class WiFiManager:
                 summary["risk_distribution"].get(rl, 0) + 1
 
         logger.info(
-            "Security report generated: %d networks, "
-            "%d vulnerable, %d cracked",
-            len(networks), vuln_count, cracked_count
+            f"Security report generated: {len(networks)} networks, "
+            f"{vuln_count} vulnerable, {cracked_count} cracked"
         )
 
         return {
